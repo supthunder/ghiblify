@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useCallback, useEffect, useRef } from "react"
-import { Sparkles, ImageIcon, Moon, Sun, X, Plus, ChevronLeft, ChevronRight } from "lucide-react"
+import { Sparkles, ImageIcon, Moon, Sun, X, Plus, ChevronLeft, ChevronRight, Download, Share2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
@@ -24,6 +24,23 @@ export default function Home() {
   const [currentHistoryIndex, setCurrentHistoryIndex] = useState(0)
   const [isDarkMode, setIsDarkMode] = useState(true) // Default to dark mode
   const fileInputRef = useRef<HTMLInputElement>(null)
+  
+  // Touch swipe handling
+  const touchStartX = useRef<number | null>(null)
+  const touchEndX = useRef<number | null>(null)
+  const [isTransitioning, setIsTransitioning] = useState(false)
+  const [swipeDirection, setSwipeDirection] = useState<"left" | "right" | null>(null)
+  
+  // Handle swipe transition animation
+  useEffect(() => {
+    if (isTransitioning) {
+      const timer = setTimeout(() => {
+        setIsTransitioning(false)
+        setSwipeDirection(null)
+      }, 300)
+      return () => clearTimeout(timer)
+    }
+  }, [isTransitioning])
 
   // Initialize dark mode
   useEffect(() => {
@@ -87,19 +104,10 @@ export default function Home() {
   }, [])
 
   const handleGenerate = useCallback(async () => {
-    if (!sourceImage) {
+    if (!sourceImage && !prompt.trim()) {
       toast({
-        title: "No image selected",
-        description: "Please upload an image first",
-        variant: "destructive",
-      })
-      return
-    }
-
-    if (!prompt.trim()) {
-      toast({
-        title: "Empty prompt",
-        description: "Please enter a prompt for the transformation",
+        title: "Missing input",
+        description: "Please enter a prompt or upload an image",
         variant: "destructive",
       })
       return
@@ -109,12 +117,12 @@ export default function Home() {
 
     try {
       // In a real app, this would call an API endpoint that uses the AI SDK
-      const result = await transformImage(sourceImage, prompt)
+      const result = await transformImage(sourceImage || '', prompt)
 
       // Add to history
       const newHistoryItem = {
         id: Date.now().toString(),
-        source: sourceImage,
+        source: sourceImage || "",
         result: result,
         prompt: prompt,
       }
@@ -134,7 +142,10 @@ export default function Home() {
 
   const navigateHistory = useCallback(
     (direction: "prev" | "next") => {
-      if (history.length === 0) return
+      if (history.length <= 1) return
+
+      setIsTransitioning(true)
+      setSwipeDirection(direction === "prev" ? "left" : "right")
 
       setCurrentHistoryIndex((prevIndex) => {
         if (direction === "prev") {
@@ -146,224 +157,299 @@ export default function Home() {
         }
       })
     },
-    [history.length],
+    [history.length]
   )
-
-  const loadHistoryItem = useCallback(
-    (index: number) => {
-      if (history.length === 0 || index >= history.length) return
-
-      const item = history[index]
-      setSourceImage(item.source)
-      setPrompt(item.prompt)
-    },
-    [history],
-  )
+  
+  // Touch event handlers for swipe navigation
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (history.length <= 1) return
+    touchStartX.current = e.touches[0].clientX
+    touchEndX.current = null
+  }, [history.length])
+  
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!touchStartX.current) return
+    touchEndX.current = e.touches[0].clientX
+  }, [])
+  
+  const handleTouchEnd = useCallback(() => {
+    if (!touchStartX.current || !touchEndX.current) {
+      touchStartX.current = null
+      touchEndX.current = null
+      return
+    }
+    
+    const diffX = touchEndX.current - touchStartX.current
+    
+    // Check if the swipe was significant enough (at least 50px)
+    if (Math.abs(diffX) > 50) {
+      if (diffX > 0) {
+        // Swiped right - go to previous (older) image
+        if (currentHistoryIndex < history.length - 1) {
+          navigateHistory("prev")
+        }
+      } else {
+        // Swiped left - go to next (newer) image
+        if (currentHistoryIndex > 0) {
+          navigateHistory("next")
+        }
+      }
+    }
+    
+    touchStartX.current = null
+    touchEndX.current = null
+  }, [currentHistoryIndex, history.length, navigateHistory])
 
   // Current displayed image from history
   const currentImage = history.length > 0 ? history[currentHistoryIndex].result : null
 
   return (
-    <div className="min-h-screen bg-zinc-950">
-      <header className="border-b border-zinc-800 sticky top-0 z-10 bg-zinc-950/80 backdrop-blur-md">
+    <div className="min-h-screen bg-zinc-950 text-white flex flex-col">
+      <header className="fixed top-0 left-0 right-0 border-b border-zinc-800/30 z-10 bg-zinc-950/90 backdrop-blur-md">
         <div className="container mx-auto px-4 py-3 flex justify-between items-center">
           <Logo />
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={toggleDarkMode} className="rounded-full">
-              {isDarkMode ? <Sun className="h-5 w-5 text-yellow-400" /> : <Moon className="h-5 w-5" />}
-            </Button>
-          </div>
+          <Button variant="ghost" size="icon" onClick={toggleDarkMode} className="rounded-full">
+            {isDarkMode ? <Sun className="h-5 w-5 text-zinc-400" /> : <Moon className="h-5 w-5" />}
+          </Button>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
-        <div className={cn("grid gap-8", isMobile ? "grid-cols-1" : "grid-cols-2")}>
-          <div className="space-y-6">
-            <div className="bg-zinc-900 rounded-xl border border-zinc-800 shadow-lg">
-              <div className="p-6 space-y-5">
-                <h2 className="text-xl font-semibold text-white">Transform Your Image</h2>
-
-                <div className="space-y-4">
-                  {/* Integrated Input Area with Image Upload */}
-                  <div
-                    {...getRootProps()}
-                    className={cn(
-                      "relative rounded-2xl bg-zinc-800 border border-zinc-700 transition-all duration-300 overflow-hidden",
-                      isDragActive ? "border-zinc-500" : "hover:border-zinc-600",
-                    )}
+      <main className="container mx-auto px-4 py-8 flex-1 pt-20 max-w-6xl">
+        <div className="rounded-2xl border border-zinc-800/50 bg-zinc-900/50 p-8 shadow-xl">
+          <h1 className="text-xl font-medium mb-5">Transform your image with Ghiblify</h1>
+          
+          <div className={cn("grid gap-6", isMobile ? "grid-cols-1" : "grid-cols-5")}>
+            {/* Left Column - Input */}
+            <div className="space-y-6 col-span-2">
+              {/* Prompt Input with integrated image upload */}
+              <div 
+                {...getRootProps()}
+                className={cn(
+                  "relative rounded-xl border border-zinc-800/70 bg-zinc-900 overflow-hidden transition-all",
+                  isDragActive ? "border-zinc-500 shadow-lg shadow-zinc-800/20" : "hover:border-zinc-700"
+                )}
+              >
+                <input {...getInputProps()} />
+                
+                <div className="relative">
+                  <Textarea
+                    placeholder="Enter your prompt here..."
+                    value={prompt}
+                    onChange={handlePromptChange}
+                    className="min-h-[100px] bg-transparent border-0 rounded-none text-white placeholder:text-zinc-500 resize-none p-4 pr-12 focus-visible:ring-0"
+                  />
+                  
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-3 top-3 rounded-full h-8 w-8 bg-zinc-900/90 hover:bg-zinc-800/80"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      open()
+                    }}
                   >
-                    <input {...getInputProps()} />
-
-                    <div className="flex items-center p-2">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="rounded-full h-10 w-10 flex-shrink-0 bg-transparent hover:bg-zinc-700"
-                        onClick={open}
-                      >
-                        <Plus className="h-5 w-5 text-zinc-400" />
-                      </Button>
-
-                      <Textarea
-                        placeholder="Enter your transformation prompt..."
-                        value={prompt}
-                        onChange={handlePromptChange}
-                        className="min-h-[50px] max-h-[200px] bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-white placeholder:text-zinc-400 resize-none py-3 px-2"
-                      />
-
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="rounded-full h-10 w-10 flex-shrink-0 bg-zinc-700 hover:bg-zinc-600"
-                        onClick={handleGenerate}
-                        disabled={isGenerating || !sourceImage}
-                      >
-                        {isGenerating ? (
-                          <Sparkles className="h-5 w-5 text-zinc-300 animate-spin" />
-                        ) : (
-                          <Sparkles className="h-5 w-5 text-zinc-300" />
-                        )}
-                      </Button>
-                    </div>
+                    <Plus className="h-4 w-4 text-zinc-400" />
+                  </Button>
+                </div>
+                
+                {/* Image Preview */}
+                {sourceImage && (
+                  <div className="relative border-t border-zinc-800/50 h-48">
+                    <img
+                      src={sourceImage}
+                      alt="Source image"
+                      className="w-full h-full object-contain p-2"
+                    />
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      className="absolute top-2 right-2 rounded-full h-6 w-6 bg-zinc-800/80 hover:bg-zinc-700 border-none"
+                      onClick={handleClearImage}
+                    >
+                      <X className="h-3 w-3 text-zinc-300" />
+                    </Button>
                   </div>
-
-                  {/* Image Preview */}
-                  {sourceImage && (
-                    <div className="relative rounded-xl overflow-hidden border border-zinc-700 h-[200px]">
-                      <img
-                        src={sourceImage || "/placeholder.svg"}
-                        alt="Preview"
-                        className="w-full h-full object-contain"
-                      />
-                      <Button
-                        variant="destructive"
-                        size="icon"
-                        className="absolute top-3 right-3 rounded-full shadow-lg opacity-90 hover:opacity-100"
-                        onClick={handleClearImage}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  )}
-
-                  <div className="space-y-3">
-                    <h3 className="text-sm font-medium text-zinc-400">Suggested Tags</h3>
-                    <PromptTags onTagClick={handleTagClick} />
-                  </div>
+                )}
+                
+                <div className="border-t border-zinc-800/50 p-2 flex justify-between items-center">
+                  <p className="text-xs text-zinc-500 ml-2">
+                    {isDragActive ? "Drop image here" : "Drag & drop or click + to upload an image"}
+                  </p>
+                  
+                  <Button 
+                    className="rounded-full bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-1.5 h-auto text-sm"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleGenerate()
+                    }}
+                    disabled={isGenerating}
+                  >
+                    {isGenerating ? (
+                      <div className="flex items-center gap-2">
+                        <div className="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full"></div>
+                        <span>Generating...</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="h-4 w-4" />
+                        <span>Generate</span>
+                      </div>
+                    )}
+                  </Button>
                 </div>
               </div>
+              
+              {/* Suggested tags */}
+              <div className="space-y-3">
+                <h2 className="text-sm font-medium text-zinc-400">Suggested Tags</h2>
+                <PromptTags onTagClick={handleTagClick} className="opacity-80" />
+              </div>
             </div>
-          </div>
-
-          <div>
-            <div className="bg-zinc-900 rounded-xl border border-zinc-800 shadow-lg">
-              <div className="p-6 space-y-5">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-xl font-semibold text-white">Generated Image</h2>
-
-                  {history.length > 0 && (
-                    <div className="flex items-center gap-2 text-zinc-400">
-                      <span className="text-sm">
-                        {currentHistoryIndex + 1} of {history.length}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="relative aspect-square rounded-xl border border-dashed border-zinc-700 flex items-center justify-center bg-zinc-800 overflow-hidden transition-all duration-300">
-                  {currentImage ? (
-                    <div className="relative w-full h-full">
+            
+            {/* Right Column - Result Image */}
+            <div className="col-span-3 space-y-4">
+              {/* Swipeable image container */}
+              <div 
+                className="relative aspect-square rounded-xl overflow-hidden border border-zinc-800/70 touch-manipulation cursor-grab"
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+              >
+                {currentImage ? (
+                  <div className="relative w-full h-full">
+                    <div 
+                      className={cn(
+                        "absolute inset-0 transition-transform duration-300 ease-in-out",
+                        isTransitioning && swipeDirection === "left" && "translate-x-[-100%]",
+                        isTransitioning && swipeDirection === "right" && "translate-x-[100%]"
+                      )}
+                    >
                       <img
-                        src={currentImage || "/placeholder.svg"}
-                        alt="Generated"
-                        className="w-full h-full object-contain"
+                        src={currentImage}
+                        alt="Generated result"
+                        className="w-full h-full object-cover"
                       />
-
-                      {/* Navigation arrows */}
-                      {history.length > 1 && (
-                        <>
+                    </div>
+                    
+                    {/* Navigation indicators */}
+                    {history.length > 1 && (
+                      <>
+                        <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-zinc-900/60 to-transparent pointer-events-none flex items-center justify-between px-4">
+                          <div className="text-xs text-white/80 backdrop-blur-sm bg-zinc-900/40 py-1 px-3 rounded-full">
+                            {currentHistoryIndex + 1} / {history.length}
+                          </div>
+                          
+                          <div className="text-xs text-white/80 backdrop-blur-sm bg-zinc-900/40 py-1 px-3 rounded-full">
+                            Swipe to navigate
+                          </div>
+                        </div>
+                        
+                        <div className="absolute inset-y-0 left-0 w-12 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
                           {currentHistoryIndex < history.length - 1 && (
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-zinc-800/80 hover:bg-zinc-700/80"
+                              className="rounded-full bg-zinc-900/40 backdrop-blur-sm"
                               onClick={() => navigateHistory("prev")}
                             >
-                              <ChevronLeft className="h-6 w-6 text-white" />
+                              <ChevronLeft className="h-5 w-5 text-white" />
                             </Button>
                           )}
-
+                        </div>
+                        
+                        <div className="absolute inset-y-0 right-0 w-12 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
                           {currentHistoryIndex > 0 && (
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-zinc-800/80 hover:bg-zinc-700/80"
+                              className="rounded-full bg-zinc-900/40 backdrop-blur-sm"
                               onClick={() => navigateHistory("next")}
                             >
-                              <ChevronRight className="h-6 w-6 text-white" />
+                              <ChevronRight className="h-5 w-5 text-white" />
                             </Button>
                           )}
-                        </>
-                      )}
-
-                      {/* Navigation dots */}
-                      {history.length > 1 && (
-                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5">
-                          {history.map((_, index) => (
-                            <button
-                              key={index}
-                              className={cn(
-                                "w-2 h-2 rounded-full transition-all",
-                                index === currentHistoryIndex ? "bg-white w-4" : "bg-zinc-500 hover:bg-zinc-400",
-                              )}
-                              onClick={() => setCurrentHistoryIndex(index)}
-                            />
-                          ))}
                         </div>
-                      )}
-
-                      {/* Prompt display */}
-                      <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-zinc-900/90 to-transparent p-4 pt-8">
-                        <p className="text-sm text-white line-clamp-2">{history[currentHistoryIndex].prompt}</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-center p-12 text-zinc-400">
-                      <div className="relative w-24 h-24 mx-auto mb-4">
-                        <div className="absolute inset-0 bg-zinc-700 rounded-full opacity-50 animate-pulse-slow"></div>
-                        <ImageIcon className="relative z-10 w-full h-full p-6 text-zinc-300" />
-                      </div>
-                      <p className="text-lg">Your Ghibli-inspired creation will appear here</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Thumbnail navigation */}
-                {history.length > 1 && (
-                  <div className="overflow-x-auto pb-2">
-                    <div className="flex gap-2">
-                      {history.map((item, index) => (
-                        <button
-                          key={item.id}
-                          className={cn(
-                            "flex-shrink-0 w-16 h-16 rounded-md overflow-hidden border-2 transition-all",
-                            index === currentHistoryIndex ? "border-white" : "border-transparent hover:border-zinc-600",
-                          )}
-                          onClick={() => setCurrentHistoryIndex(index)}
-                        >
-                          <img
-                            src={item.result || "/placeholder.svg"}
-                            alt={`Generation ${index + 1}`}
-                            className="w-full h-full object-cover"
-                          />
-                        </button>
-                      ))}
-                    </div>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <div className="w-full h-full bg-zinc-900 flex flex-col items-center justify-center">
+                    <Sparkles className="h-10 w-10 text-zinc-600 mb-4" />
+                    <p className="text-zinc-400">Your Ghibli-inspired creation will appear here</p>
                   </div>
                 )}
               </div>
+              
+              {/* Image Actions */}
+              {currentImage && (
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="icon" 
+                    className="rounded-full border border-zinc-700 bg-zinc-900/50 hover:bg-zinc-800"
+                  >
+                    <Download className="h-4 w-4 text-zinc-300" />
+                  </Button>
+                  
+                  <Button className="flex-1 rounded-full bg-zinc-800 hover:bg-zinc-700">
+                    <Share2 className="h-4 w-4 mr-2" />
+                    Share
+                  </Button>
+                </div>
+              )}
+              
+              {/* History */}
+              {history.length > 0 && (
+                <div className="space-y-2 mt-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <h2 className="text-sm font-medium text-zinc-400">History</h2>
+                    
+                    {history.length > 1 && (
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="rounded-full h-7 w-7 bg-zinc-900/50"
+                          onClick={() => navigateHistory("prev")}
+                          disabled={currentHistoryIndex >= history.length - 1}
+                        >
+                          <ChevronLeft className="h-4 w-4 text-zinc-400" />
+                        </Button>
+                        <span className="text-xs text-zinc-500">{currentHistoryIndex + 1}/{history.length}</span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="rounded-full h-7 w-7 bg-zinc-900/50"
+                          onClick={() => navigateHistory("next")}
+                          disabled={currentHistoryIndex <= 0}
+                        >
+                          <ChevronRight className="h-4 w-4 text-zinc-400" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="flex gap-2 overflow-x-auto pb-2 hide-scrollbar">
+                    {history.map((item, index) => (
+                      <button
+                        key={item.id}
+                        className={cn(
+                          "h-24 w-24 rounded-lg flex-shrink-0 overflow-hidden border-2 transition-all",
+                          index === currentHistoryIndex ? "border-zinc-400" : "border-transparent"
+                        )}
+                        onClick={() => setCurrentHistoryIndex(index)}
+                      >
+                        <img
+                          src={item.result}
+                          alt={`History ${index + 1}`}
+                          className="h-full w-full object-cover"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
