@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useCallback, useEffect, useRef } from "react"
-import { Sparkles, ImageIcon, Moon, Sun, X, Plus, ChevronLeft, ChevronRight, Download, Share2 } from "lucide-react"
+import { Sparkles, ImageIcon, X, Plus, ChevronLeft, ChevronRight, Download, Share2, Pencil } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
@@ -20,9 +20,9 @@ export default function Home() {
   const [sourceImage, setSourceImage] = useState<string | null>(null)
   const [prompt, setPrompt] = useState<string>("convert this image into studio ghibli style anime")
   const [isGenerating, setIsGenerating] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
   const [history, setHistory] = useState<Array<{ id: string; source: string; result: string; prompt: string }>>([])
   const [currentHistoryIndex, setCurrentHistoryIndex] = useState(0)
-  const [isDarkMode, setIsDarkMode] = useState(true) // Default to dark mode
   const fileInputRef = useRef<HTMLInputElement>(null)
   
   // Touch swipe handling
@@ -30,6 +30,9 @@ export default function Home() {
   const touchEndX = useRef<number | null>(null)
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [swipeDirection, setSwipeDirection] = useState<"left" | "right" | null>(null)
+  
+  // Current displayed image from history (moved up to fix reference in handleEdit)
+  const currentImage = history.length > 0 ? history[currentHistoryIndex].result : null
   
   // Handle swipe transition animation
   useEffect(() => {
@@ -42,24 +45,9 @@ export default function Home() {
     }
   }, [isTransitioning])
 
-  // Initialize dark mode
+  // Initialize dark mode - always use dark mode
   useEffect(() => {
-    // Always start with dark mode
     document.documentElement.classList.add("dark")
-  }, [])
-
-  const toggleDarkMode = useCallback(() => {
-    setIsDarkMode((prev) => {
-      const newMode = !prev
-      if (newMode) {
-        document.documentElement.classList.add("dark")
-        document.documentElement.classList.remove("light")
-      } else {
-        document.documentElement.classList.add("light")
-        document.documentElement.classList.remove("dark")
-      }
-      return newMode
-    })
   }, [])
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
@@ -139,6 +127,56 @@ export default function Home() {
       setIsGenerating(false)
     }
   }, [sourceImage, prompt, toast])
+  
+  const handleEdit = useCallback(async () => {
+    // Get the current image from the history at the current index
+    const imageToEdit = history.length > 0 ? history[currentHistoryIndex].result : null
+    
+    if (!imageToEdit) {
+      toast({
+        title: "No image to edit",
+        description: "Please generate an image first",
+        variant: "destructive",
+      })
+      return
+    }
+    
+    if (!prompt.trim()) {
+      toast({
+        title: "Missing edit instructions",
+        description: "Please enter instructions for editing",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsEditing(true)
+
+    try {
+      // Use the current result as the source image for editing
+      // In a real app, this would call an API endpoint that uses the AI SDK
+      const result = await transformImage(imageToEdit, prompt)
+
+      // Add to history
+      const newHistoryItem = {
+        id: Date.now().toString(),
+        source: imageToEdit,
+        result: result,
+        prompt: prompt,
+      }
+
+      setHistory((prev) => [newHistoryItem, ...prev])
+      setCurrentHistoryIndex(0) // Set to the newest item
+    } catch (error) {
+      toast({
+        title: "Edit failed",
+        description: "There was an error editing your image",
+        variant: "destructive",
+      })
+    } finally {
+      setIsEditing(false)
+    }
+  }, [history, currentHistoryIndex, prompt, toast])
 
   const navigateHistory = useCallback(
     (direction: "prev" | "next") => {
@@ -200,23 +238,13 @@ export default function Home() {
     touchEndX.current = null
   }, [currentHistoryIndex, history.length, navigateHistory])
 
-  // Current displayed image from history
-  const currentImage = history.length > 0 ? history[currentHistoryIndex].result : null
-
   return (
     <div className="min-h-screen bg-zinc-950 text-white flex flex-col">
-      <header className="fixed top-0 left-0 right-0 border-b border-zinc-800/30 z-10 bg-zinc-950/90 backdrop-blur-md">
-        <div className="container mx-auto px-4 py-3 flex justify-between items-center">
-          <Logo />
-          <Button variant="ghost" size="icon" onClick={toggleDarkMode} className="rounded-full">
-            {isDarkMode ? <Sun className="h-5 w-5 text-zinc-400" /> : <Moon className="h-5 w-5" />}
-          </Button>
-        </div>
-      </header>
-
-      <main className="container mx-auto px-4 py-8 flex-1 pt-20 max-w-6xl">
+      <main className="container mx-auto px-4 py-8 flex-1 pt-8 max-w-6xl">
         <div className="rounded-2xl border border-zinc-800/50 bg-zinc-900/50 p-8 shadow-xl">
-          <h1 className="text-xl font-medium mb-5">Transform your image with Ghiblify</h1>
+          <h1 className="text-xl font-medium mb-5">
+            Ghiblify - 4o Image Generation
+          </h1>
           
           <div className={cn("grid gap-6", isMobile ? "grid-cols-1" : "grid-cols-5")}>
             {/* Left Column - Input */}
@@ -277,26 +305,49 @@ export default function Home() {
                     {isDragActive ? "Drop image here" : "Drag & drop or click + to upload an image"}
                   </p>
                   
-                  <Button 
-                    className="rounded-full bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-1.5 h-auto text-sm"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleGenerate()
-                    }}
-                    disabled={isGenerating}
-                  >
-                    {isGenerating ? (
-                      <div className="flex items-center gap-2">
-                        <div className="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full"></div>
-                        <span>Generating...</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <Sparkles className="h-4 w-4" />
-                        <span>Generate</span>
-                      </div>
-                    )}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button 
+                      className="rounded-full bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-1.5 h-auto text-sm"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleGenerate()
+                      }}
+                      disabled={isGenerating || isEditing}
+                    >
+                      {isGenerating ? (
+                        <div className="flex items-center gap-2">
+                          <div className="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full"></div>
+                          <span>Generating...</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <Sparkles className="h-4 w-4" />
+                          <span>Generate</span>
+                        </div>
+                      )}
+                    </Button>
+                    
+                    <Button 
+                      className="rounded-full bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-1.5 h-auto text-sm"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleEdit()
+                      }}
+                      disabled={isGenerating || isEditing || !currentImage}
+                    >
+                      {isEditing ? (
+                        <div className="flex items-center gap-2">
+                          <div className="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full"></div>
+                          <span>Editing...</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <Pencil className="h-4 w-4" />
+                          <span>Edit</span>
+                        </div>
+                      )}
+                    </Button>
+                  </div>
                 </div>
               </div>
               
