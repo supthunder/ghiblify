@@ -1,0 +1,62 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="630" fill="#09090b" />
+  
+  <!-- Background pattern -->
+  <g opacity="0.05">
+    <path d="M0 0h50v50H0z" fill="white" />
+    <path d="M100 0h50v50h-50z" fill="white" />
+    <path d="M200 0h50v50h-50z" fill="white" />
+    <path d="M300 0h50v50h-50z" fill="white" />
+    <path d="M400 0h50v50h-50z" fill="white" />
+    <path d="M500 0h50v50h-50z" fill="white" />
+    <path d="M600 0h50v50h-50z" fill="white" />
+    <path d="M700 0h50v50h-50z" fill="white" />
+    <path d="M800 0h50v50h-50z" fill="white" />
+    <path d="M900 0h50v50h-50z" fill="white" />
+    <path d="M1000 0h50v50h-50z" fill="white" />
+    <path d="M1100 0h50v50h-50z" fill="white" />
+    
+    <path d="M50 50h50v50H50z" fill="white" />
+    <path d="M150 50h50v50h-50z" fill="white" />
+    <path d="M250 50h50v50h-50z" fill="white" />
+    <path d="M350 50h50v50h-50z" fill="white" />
+    <path d="M450 50h50v50h-50z" fill="white" />
+    <path d="M550 50h50v50h-50z" fill="white" />
+    <path d="M650 50h50v50h-50z" fill="white" />
+    <path d="M750 50h50v50h-50z" fill="white" />
+    <path d="M850 50h50v50h-50z" fill="white" />
+    <path d="M950 50h50v50h-50z" fill="white" />
+    <path d="M1050 50h50v50h-50z" fill="white" />
+    <path d="M1150 50h50v50h-50z" fill="white" />
+    
+    <!-- Repeat for the rest of the rows -->
+  </g>
+  
+  <!-- Card Container -->
+  <rect x="150" y="165" width="900" height="300" rx="12" fill="#18181b" stroke="#27272a" stroke-width="2" />
+  
+  <!-- Ghiblify Logo/Icon -->
+  <g transform="translate(210 215)">
+    <circle cx="50" cy="50" r="50" fill="#3f3f46" />
+    <path d="M50 20c-16.6 0-30 13.4-30 30s13.4 30 30 30 30-13.4 30-30-13.4-30-30-30zm-10 45l-15-15 5-5 10 10 25-25 5 5-30 30z" fill="white" />
+  </g>
+  
+  <!-- Title and Description -->
+  <text x="330" y="245" font-family="system-ui, sans-serif" font-weight="700" font-size="46" fill="white">Ghiblify</text>
+  <text x="330" y="295" font-family="system-ui, sans-serif" font-weight="500" font-size="30" fill="#a1a1aa">4o Image Generation</text>
+  
+  <!-- Feature Highlights -->
+  <g transform="translate(330 325)">
+    <circle cx="15" cy="15" r="6" fill="#52525b" />
+    <text x="35" y="22" font-family="system-ui, sans-serif" font-size="22" fill="#d4d4d8">Transform images with Ghibli-style AI</text>
+    
+    <circle cx="15" cy="55" r="6" fill="#52525b" />
+    <text x="35" y="62" font-family="system-ui, sans-serif" font-size="22" fill="#d4d4d8">Edit and refine your creations</text>
+    
+    <circle cx="15" cy="95" r="6" fill="#52525b" />
+    <text x="35" y="102" font-family="system-ui, sans-serif" font-size="22" fill="#d4d4d8">Simple, modern interface</text>
+  </g>
+  
+  <!-- URL at the bottom -->
+  <text x="600" y="535" font-family="system-ui, sans-serif" font-weight="500" font-size="24" fill="#71717a" text-anchor="middle">ghiblify.vercel.app</text>
+</svg> 
