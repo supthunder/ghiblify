@@ -19,12 +19,11 @@ export async function POST(request: NextRequest) {
     // If there's a source image, use DALL-E 2 for variations
     // If no source image, use DALL-E 3 for generation
     if (sourceImage) {
-      // For image variations/editing, we need to convert base64 to a file-like object
-      // This is a simplified approach - in production you might want to use a different method
+      // For image variations, we need to convert base64 to buffer
       const base64Data = sourceImage.replace(/^data:image\/[a-z]+;base64,/, '')
       const buffer = Buffer.from(base64Data, 'base64')
       
-      // Create a File-like object
+      // Create a proper file object for OpenAI API
       const file = new File([buffer], 'image.png', { type: 'image/png' })
       
       const response = await openai.images.createVariation({
@@ -34,7 +33,7 @@ export async function POST(request: NextRequest) {
       })
 
       return NextResponse.json({
-        imageUrl: response.data[0].url,
+        imageUrl: response.data[0]?.url || '',
       })
     } else {
       // Generate new image with DALL-E 3
@@ -48,7 +47,7 @@ export async function POST(request: NextRequest) {
       })
 
       return NextResponse.json({
-        imageUrl: response.data[0].url,
+        imageUrl: response.data[0]?.url || '',
       })
     }
   } catch (error) {
