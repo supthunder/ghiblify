@@ -3,15 +3,14 @@
 import type React from "react"
 
 import { useState, useCallback, useEffect, useRef } from "react"
-import { Sparkles, ImageIcon, X, Plus, ChevronLeft, ChevronRight, Download, Share2, Pencil } from "lucide-react"
+import { Sparkles, X, Plus, ChevronLeft, ChevronRight, Download, Share2, Pencil } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { useMobile } from "@/hooks/use-mobile"
 import PromptTags from "@/components/prompt-tags"
-import Logo from "@/components/logo"
-import { transformImage } from "@/lib/transform-image"
+import { transformImage, editImage } from "@/lib/transform-image"
 import { useDropzone } from "react-dropzone"
 
 export default function Home() {
@@ -23,7 +22,6 @@ export default function Home() {
   const [isEditing, setIsEditing] = useState(false)
   const [history, setHistory] = useState<Array<{ id: string; source: string; result: string; prompt: string }>>([])
   const [currentHistoryIndex, setCurrentHistoryIndex] = useState(0)
-  const fileInputRef = useRef<HTMLInputElement>(null)
   
   // Touch swipe handling
   const touchStartX = useRef<number | null>(null)
@@ -118,6 +116,7 @@ export default function Home() {
       setHistory((prev) => [newHistoryItem, ...prev])
       setCurrentHistoryIndex(0) // Set to the newest item
     } catch (error) {
+      console.error('Error generating image:', error)
       toast({
         title: "Generation failed",
         description: "There was an error generating your image",
@@ -154,8 +153,8 @@ export default function Home() {
 
     try {
       // Use the current result as the source image for editing
-      // In a real app, this would call an API endpoint that uses the AI SDK
-      const result = await transformImage(imageToEdit, prompt)
+      // Using the dedicated editImage function for proper image editing
+      const result = await editImage(imageToEdit, prompt)
 
       // Add to history
       const newHistoryItem = {
@@ -168,6 +167,7 @@ export default function Home() {
       setHistory((prev) => [newHistoryItem, ...prev])
       setCurrentHistoryIndex(0) // Set to the newest item
     } catch (error) {
+      console.error('Error editing image:', error)
       toast({
         title: "Edit failed",
         description: "There was an error editing your image",
